@@ -1,21 +1,33 @@
+import numpy as np
+from src.Vetor import Vetor
+
 class Ponto:
-    def __init__(self, x=0, y=0, z=0):
-        self.x = x
-        self.y = y
-        self.z = z
+    def __init__(self, x=0.0, y=0.0, z=0.0):
+        self._data = np.array([x, y, z], dtype=np.float64)
 
-    # Ponto + Vetor → Ponto
-    def __add__(self, v):
-        return Ponto(self.x + v.x,
-                     self.y + v.y,
-                     self.z + v.z)
+    @property
+    def x(self): return self._data[0]
+    @property
+    def y(self): return self._data[1]
+    @property
+    def z(self): return self._data[2]
 
-    # Ponto - Ponto → Vetor
+    def __add__(self, other: Vetor) -> 'Ponto':
+        """Ponto + Vetor = Ponto (Deslocamento)."""
+        if isinstance(other, Vetor):
+            return Ponto(*(self._data + other._data))
+        raise TypeError("Ponto só pode ser somado a um Vetor.")
+
     def __sub__(self, other):
-        from src.Vetor import Vetor
-        return Vetor(self.x - other.x,
-                     self.y - other.y,
-                     self.z - other.z)
+        """
+        Ponto - Ponto = Vetor (Direção/distância entre eles).
+        Ponto - Vetor = Ponto (Recuar a posição).
+        """
+        if isinstance(other, Ponto):
+            return Vetor(*(self._data - other._data))
+        elif isinstance(other, Vetor):
+            return Ponto(*(self._data - other._data))
+        raise TypeError("Subtração inválida para Ponto.")
 
-    def __str__(self):
-        return f"({self.x}, {self.y}, {self.z})"
+    def __repr__(self):
+        return f"Ponto({self.x:.4f}, {self.y:.4f}, {self.z:.4f})"
