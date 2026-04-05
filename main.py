@@ -1,7 +1,7 @@
 import sys
 from utils.Scene.sceneParser import SceneJsonLoader
-from src.Camera import Camera
-from src.Geometria import intersect_sphere, intersect_plane
+from camera import Camera
+from geometria import intersect_sphere, intersect_plane
 
 def main():
     if len(sys.argv) < 2:
