@@ -1,7 +1,8 @@
 import sys
 from utils.Scene.sceneParser import SceneJsonLoader
+from utils.MeshReader.ObjReader import ObjReader
 from camera import Camera
-from geometria import intersect_sphere, intersect_plane
+from geometria import intersect_sphere, intersect_plane, intersect_triangle
 
 
 def main():
@@ -36,6 +37,18 @@ def main():
     scene_data = SceneJsonLoader.load_file(scene_file)
     cam = Camera(scene_data.camera)
     
+# --- PRÉ-CARREGAMENTO DE MALHAS ---
+    # Guarda os ObjReaders na memória para não reler o arquivo a cada pixel
+    loaded_meshes = {}
+    for obj in scene_data.objects:
+        if obj.obj_type == "mesh":
+            # Pega o caminho do arquivo (Ajuste a string "filename" se o seu JSON usar outro nome, ex: "file")
+            obj_path = obj.get_property("path") 
+            if obj_path not in loaded_meshes:
+                print(f"Carregando malha: {obj_path}...", file=sys.stderr)
+                loaded_meshes[obj_path] = ObjReader(obj_path)
+    # ----------------------------------
+
     print(f"P3\n{cam.hres} {cam.vres}\n255")
     
     for j in range(cam.vres):
@@ -60,6 +73,14 @@ def main():
                     normal = obj.get_vetor("normal").normalize()
                     t = intersect_plane(cam.C, ray_dir, ponto_plano, normal)
                 
+                elif obj.obj_type == "mesh":
+                    # Busca a malha pré-carregada na memória
+                    mesh_reader = loaded_meshes[obj.get_property("path")]
+                    
+                    # Testa interseção com CADA triângulo da malha
+                    for face_pts in mesh_reader.get_face_points():
+                        t = intersect_triangle(cam.C, ray_dir, face_pts[0], face_pts[1], face_pts[2])
+
                 if t < closest_t:
                     closest_t = t
                     hit_color = obj.material.color

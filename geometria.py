@@ -71,3 +71,52 @@ def intersect_plane(origem: Ponto, direcao: Vetor, p0: Ponto, normal: Vetor) -> 
             return t
             
     return float('inf')
+
+
+def intersect_triangle(origem: Ponto, direcao: Vetor, v0: Ponto, v1: Ponto, v2: Ponto) -> float:
+    """
+    Calcula a interseção entre um raio e um triângulo usando o Teste de Arestas 
+    (equivalente às coordenadas baricêntricas por áreas sinalizadas).
+    """
+    # 1. Encontra a normal do plano do triângulo
+    aresta1 = v1 - v0
+    aresta2 = v2 - v0
+    normal = aresta1.cross(aresta2)  # O vetor normal dita a "frente" do triângulo
+    
+    # 2. Interseção do Raio com o Plano
+    denom = direcao.dot(normal)
+    if abs(denom) < 1e-8:
+        return float('inf') # Raio paralelo ao triângulo
+        
+    p0_origem = v0 - origem
+    t = p0_origem.dot(normal) / denom
+    
+    if t < 0.001:
+        return float('inf') # Triângulo está atrás da câmera
+        
+    # 3. Descobre o Ponto P exato da interseção no plano
+    p = origem + (direcao * t)
+    
+    # 4. Checagem Baricêntrica (Fórmula de áreas sinalizadas)
+    # Se o ponto P estiver à direita de alguma aresta (sentido anti-horário), ele está fora.
+    
+    # Aresta 0: v0 -> v1
+    edge0 = v1 - v0
+    vp0 = p - v0
+    if normal.dot(edge0.cross(vp0)) < 0:
+        return float('inf')
+        
+    # Aresta 1: v1 -> v2
+    edge1 = v2 - v1
+    vp1 = p - v1
+    if normal.dot(edge1.cross(vp1)) < 0:
+        return float('inf')
+        
+    # Aresta 2: v2 -> v0
+    edge2 = v0 - v2
+    vp2 = p - v2
+    if normal.dot(edge2.cross(vp2)) < 0:
+        return float('inf')
+        
+    # Se passou por todos os testes, o ponto está dentro do triângulo!
+    return t
