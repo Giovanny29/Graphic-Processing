@@ -261,7 +261,7 @@
       "path": "./utils/input/cubo.obj",
       "transform": [
         { "type": "scaling", "factors": [20, 20, 20] },
-        { "type": "rotation", "angle": [60, 0, 0] },
+        { "type": "rotation", "angle": [0, 0, 0.785398163] },
         { "type": "translation", "vector": [0, 28, 0] }
       ]
     },

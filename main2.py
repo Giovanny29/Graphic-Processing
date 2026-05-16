@@ -23,17 +23,9 @@ from transformacoes import (
     aplicar_matriz_vetor
 )
 
-from lighting import Hit
-
 from src.Ponto import Ponto
-from src.Vetor import Vetor
 
-from lighting import (
-    Hit,
-    Light,
-    AmbientLight,
-    phong_shading
-)
+from lighting import Light, AmbientLight, Hit, phong_shading
 
 EPSILON = 1e-6
 
@@ -41,19 +33,42 @@ EPSILON = 1e-6
 # ============================================================
 # INTERSEÇÃO
 # ============================================================
+
 def intersect_object(obj, ray_origin, ray_dir):
 
     if obj.obj_type == "sphere":
-        return intersect_sphere(ray_origin, ray_dir, obj.relative_pos, obj.get_num("radius")), -1
+
+        return intersect_sphere(
+            ray_origin,
+            ray_dir,
+            obj.relative_pos,
+            obj.get_num("radius")
+        )
 
     elif obj.obj_type == "plane":
-        normal = obj.get_vetor("normal").normalize()
-        return intersect_plane(ray_origin, ray_dir, obj.relative_pos, normal), -1
+
+        normal = obj.get_vetor(
+            "normal"
+        ).normalize()
+
+        return intersect_plane(
+            ray_origin,
+            ray_dir,
+            obj.relative_pos,
+            normal
+        )
 
     elif obj.obj_type == "mesh":
-        return intersect_triangles_numpy(ray_origin, ray_dir, obj.np_v0, obj.np_v1, obj.np_v2)
 
-    return float("inf"), -1
+        return intersect_triangles_numpy(
+            ray_origin,
+            ray_dir,
+            obj.np_v0,
+            obj.np_v1,
+            obj.np_v2
+        )
+
+    return float("inf")
 
 
 # ============================================================
@@ -500,19 +515,27 @@ def main():
             "Use: python main.py <cena.json> [--no-transform]",
             file=sys.stderr
         )
+
         sys.exit(1)
 
     scene_file = sys.argv[1]
 
-    apply_transform = not (
-        len(sys.argv) > 2 and sys.argv[2] == "--no-transform"
-    )
+    apply_transform = True
+
+    if (
+        len(sys.argv) > 2
+        and sys.argv[2] == "--no-transform"
+    ):
+        apply_transform = False
 
     # ========================================================
     # LOAD DA CENA
     # ========================================================
 
-    scene_data = SceneJsonLoader.load_file(scene_file)
+    scene_data = SceneJsonLoader.load_file(
+        scene_file
+    )
+
     cam = Camera(scene_data.camera)
 
     # ========================================================
@@ -520,43 +543,39 @@ def main():
     # ========================================================
 
     loaded_meshes = {}
+
     valid_objects = []
 
     for obj in scene_data.objects:
 
         if obj.obj_type == "sphere":
-            processar_esfera(obj, apply_transform)
+
+            processar_esfera(
+                obj,
+                apply_transform
+            )
 
         elif obj.obj_type == "plane":
-            processar_plano(obj, apply_transform)
+
+            processar_plano(
+                obj,
+                apply_transform
+            )
 
         elif obj.obj_type == "mesh":
-            ok = processar_malha(obj, apply_transform, loaded_meshes)
+
+            ok = processar_malha(
+                obj,
+                apply_transform,
+                loaded_meshes
+            )
+
             if not ok:
                 continue
 
         valid_objects.append(obj)
 
     scene_data.objects = valid_objects
-
-    # ========================================================
-    # LIGHTING SETUP
-    # ========================================================
-
-    ambient_light = AmbientLight(
-        scene_data.global_light.color
-    )
-
-    lights = []
-
-    for l in scene_data.light_list:
-
-        lights.append(
-            Light(
-                l.pos,
-                l.color
-            )
-        )
 
     # ========================================================
     # RENDER
@@ -574,16 +593,10 @@ def main():
 
         for i in range(cam.hres):
 
-            ray_origin = cam.C
-
-            ray_dir = cam.get_ray_direction(
-                i,
-                j
-            )
+            ray_dir = cam.get_ray_direction(i, j)
 
             closest_t = float("inf")
-
-            hit = None
+            hit_obj = None
 
             # ====================================================
             # INTERSEÇÃO
@@ -591,98 +604,77 @@ def main():
 
             for obj in scene_data.objects:
 
-                t, idx = intersect_object(
+                t = intersect_object(
                     obj,
-                    ray_origin,
+                    cam.C,
                     ray_dir
                 )
 
                 if EPSILON < t < closest_t:
-
                     closest_t = t
-
-                    hit_point = (
-                        ray_origin
-                        + ray_dir * t
-                    )
-
-                    # ================================================
-                    # NORMAL
-                    # ================================================
-
-                    if obj.obj_type == "sphere":
-
-                        normal = (
-                            hit_point
-                            - obj.relative_pos
-                        ).normalize()
-
-                    elif obj.obj_type == "plane":
-
-                        normal = obj.get_vetor(
-                            "normal"
-                        ).normalize()
-
-                    elif obj.obj_type == "mesh":
-
-                        v0 = Ponto(*obj.np_v0[idx])
-
-                        v1 = Ponto(*obj.np_v1[idx])
-
-                        v2 = Ponto(*obj.np_v2[idx])
-
-                        edge1 = v1 - v0
-
-                        edge2 = v2 - v0
-
-                        normal = (
-                            edge1
-                            .cross(edge2)
-                            .normalize()
-                        )
-
-                        # garante normal voltada pra câmera
-                        if normal.dot(ray_dir) > 0:
-
-                            normal = -normal
-
-
-                    # ================================================
-                    # HIT
-                    # ================================================
-
-                    hit = Hit(
-                        point=hit_point,
-                        normal=normal,
-                        obj=obj,
-                        t=t,
-                        index=idx
-                    )
+                    hit_obj = obj
 
             # ====================================================
             # SHADING
             # ====================================================
 
-            if hit is None:
+            if hit_obj is not None:
 
-                r, g, b = 0, 0, 0
+                hit_point = cam.C + ray_dir * closest_t
 
-            else:
+                # -----------------------------
+                # NORMAL
+                # -----------------------------
+
+                if hit_obj.obj_type == "sphere":
+
+                    hit_normal = hit_point - hit_obj.relative_pos
+
+                elif hit_obj.obj_type == "plane":
+
+                    hit_normal = hit_obj.get_vetor("normal").normalize()
+
+                elif hit_obj.obj_type == "mesh":
+
+                    # flat shading (correto agora)
+                    # precisa de vertices da face → pegar do ObjReader
+                    v0, v1, v2 = hit_obj.np_v0[0], hit_obj.np_v1[0], hit_obj.np_v2[0]
+
+                    hit_normal = np.cross(v1 - v0, v2 - v0)
+
+                # normalização segura
+                norm = np.linalg.norm(hit_normal)
+                if norm > 1e-8:
+                    hit_normal = hit_normal / norm
+
+                # -----------------------------
+                # HIT STRUCT
+                # -----------------------------
+
+                hit = Hit(hit_point, hit_normal, hit_obj)
+
+                # -----------------------------
+                # PHONG
+                # -----------------------------
 
                 color = phong_shading(
                     hit,
-                    lights,
-                    ambient_light,
+                    scene_data.light_list,
+                    scene_data.global_light,
                     cam.C,
                     scene_data.objects,
                     intersect_object
                 )
 
-                r = int(255.999 * color.x)
+                color = np.clip(color, 0, 1)
 
-                g = int(255.999 * color.y)
+                r = int(255.999 * color[0])
+                g = int(255.999 * color[1])
+                b = int(255.999 * color[2])
 
-                b = int(255.999 * color.z)
+            else:
+
+                r, g, b = 0, 0, 0
 
             print(f"{r} {g} {b}")
 
@@ -690,5 +682,7 @@ def main():
         "\nRenderização concluída!",
         file=sys.stderr
     )
-if __name__ == "__main__": 
+
+
+if __name__ == "__main__":
     main()

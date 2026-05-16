@@ -2,11 +2,26 @@ import numpy as np
 from src.Ponto import Ponto
 from src.Vetor import Vetor
 
+def garantir_ponto(p):
+    """Converte array numpy para Ponto se necessário."""
+    if isinstance(p, np.ndarray):
+        return Ponto(p[0], p[1], p[2])
+    return p
 
-def intersect_sphere(origem: Ponto, direcao: Vetor, centro: Ponto, raio: float) -> float:
+def garantir_vetor(v):
+    """Converte array numpy para Vetor se necessário."""
+    if isinstance(v, np.ndarray):
+        return Vetor(v[0], v[1], v[2])
+    return v
+
+def intersect_sphere(origem, direcao, centro, raio: float) -> float:
     """
     Calcula a interseção entre um raio e uma esfera.
     """
+    origem = garantir_ponto(origem)
+    direcao = garantir_vetor(direcao)
+    centro = garantir_ponto(centro)
+
     v = origem - centro
     
     v_dot_d = v.dot(direcao)
@@ -28,13 +43,18 @@ def intersect_sphere(origem: Ponto, direcao: Vetor, centro: Ponto, raio: float) 
     
     return float('inf')
 
-
-def intersect_plane(origem: Ponto, direcao: Vetor, p0: Ponto, normal: Vetor) -> float:
+def intersect_plane(origem, direcao, p0, normal) -> float:
     """
     Calcula a interseção entre um raio e um plano.
     """
+    origem = garantir_ponto(origem)
+    direcao = garantir_vetor(direcao)
+    p0 = garantir_ponto(p0)
+    normal = garantir_vetor(normal)
+
     denom = direcao.dot(normal)
     
+    # Agora denom é garantidamente um float, abs() funcionará
     if abs(denom) > 1e-6:
         p0_origem = p0 - origem
         t = p0_origem.dot(normal) / denom
@@ -44,15 +64,15 @@ def intersect_plane(origem: Ponto, direcao: Vetor, p0: Ponto, normal: Vetor) -> 
             
     return float('inf')
 
-
 def intersect_triangles_numpy(origem: Ponto, direcao: Vetor,
-                               v0: np.ndarray, v1: np.ndarray, v2: np.ndarray) -> float:
+                               v0: np.ndarray, v1: np.ndarray, v2: np.ndarray) -> tuple:
     """
-    Möller–Trumbore vetorizado — testa N triângulos de uma vez com numpy.
-    v0, v1, v2 são arrays (N, 3) pré-computados no pré-processamento.
-    Retorna o menor t válido ou inf se não houver interseção.
+    Möller–Trumbore vetorizado — retorna (menor t, índice do triângulo).
+    Se não houver interseção: (inf, -1)
     """
+
     EPSILON = 1e-8
+
     orig = np.array([origem.x, origem.y, origem.z])
     dire = np.array([direcao.x, direcao.y, direcao.z])
 
@@ -63,6 +83,7 @@ def intersect_triangles_numpy(origem: Ponto, direcao: Vetor,
     a = np.einsum('ij,ij->i', aresta1, h)               # (N,)
 
     mask = np.abs(a) > EPSILON
+
     f = np.where(mask, 1.0 / np.where(mask, a, 1), 0)
 
     s = orig - v0                                       # (N, 3)
@@ -70,13 +91,22 @@ def intersect_triangles_numpy(origem: Ponto, direcao: Vetor,
     mask &= (u >= 0.0) & (u <= 1.0)
 
     q = np.cross(s, aresta1)                            # (N, 3)
-    v = f * (q @ dire)                                  # (N,)  ← corrigido
+    v = f * (q @ dire)                                  # (N,)
     mask &= (v >= 0.0) & ((u + v) <= 1.0)
 
-    t = f * np.einsum('ij,ij->i', aresta2, q)                       # (N,)  ← corrigido
+    t = f * np.einsum('ij,ij->i', aresta2, q)          # (N,)
     mask &= (t > 0.001)
 
-    if not np.any(mask):
-        return float('inf')
+    # ============================================================
+    # RESULTADO
+    # ============================================================
 
-    return float(np.min(t[mask]))
+    if not np.any(mask):
+        return float('inf'), -1
+
+    valid_indices = np.where(mask)[0]
+
+    idx_local = np.argmin(t[mask])
+    idx_global = valid_indices[idx_local]
+
+    return float(t[idx_global]), int(idx_global)
